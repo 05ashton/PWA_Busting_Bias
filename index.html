@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Busting Bias Game</title>
+  <meta name="description" content="A fun game to test your reactions and bust bias!" />
+  <meta name="theme-color" content="#000000" />
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Icons for PWA and Favicon -->
+  <link rel="icon" href="/icons/icon-192.png" sizes="192x192" />
+  <link rel="apple-touch-icon" href="/icons/icon-512.png" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <h1>Busting Bias Game</h1>
+
+  <main id="game-container">
+    <!-- Stimulus and feedback area -->
+    <section id="play-area">
+      <div id="stimulus"></div>
+      <div id="feedback"></div>
+
+      <div class="buttons">
+        <button id="left-button">Left</button>
+        <button id="right-button">Right</button>
+      </div>
+
+      <div id="score">Score: 0</div>
+      <div id="game-over"></div>
+      <button id="restart" hidden>Restart</button>
+    </section>
+
+    <!-- Trophies Section -->
+    <section id="trophies-section" hidden>
+      <h2>Trophies Earned</h2>
+      <ul id="trophies-list"></ul>
+    </section>
+
+    <!-- Attempts Section -->
+    <section id="attempts-panel" hidden>
+      <h2>Your Attempts</h2>
+      <div id="attempts-list"></div>
+    </section>
+  </main>
+
+  <!-- Sounds -->
+  <audio id="correct-sound" src="correct.wav" preload="auto"></audio>
+  <audio id="incorrect-sound" src="incorrect.wav" preload="auto"></audio>
+
+  <!-- Scripts -->
+  <script src="game.js"></script>
+</body>
+</html>
