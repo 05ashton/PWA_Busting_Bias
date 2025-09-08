@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- Basic page meta -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -8,54 +9,83 @@
   <meta name="description" content="A fun game to test your reactions and bust bias!" />
   <meta name="theme-color" content="#000000" />
 
-  <!-- PWA Manifest -->
+  <!-- PWA manifest (optional) -->
   <link rel="manifest" href="/manifest.json" />
 
-  <!-- Icons for PWA and Favicon -->
+  <!-- App icons -->
   <link rel="icon" href="/icons/icon-192.png" sizes="192x192" />
   <link rel="apple-touch-icon" href="/icons/icon-512.png" />
 
-  <!-- Styles -->
+  <!-- Link to the stylesheet -->
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
+  <!--
+    Page title — visible to the user.
+    This is a normal <h1> and helps with accessibility and SEO.
+  -->
   <h1>Busting Bias Game</h1>
 
   <main id="game-container">
-    <!-- Stimulus and feedback area -->
+    <!--
+      The play area contains the stimulus (image/word), feedback, buttons,
+      score, and controls. Keeping elements semantic and named consistently
+      makes it easier for JavaScript to find them by ID.
+    -->
     <section id="play-area">
-      <div id="stimulus"></div>
-      <div id="feedback"></div>
+      <!-- The alien image (or word) will be injected here by JavaScript -->
+      <div id="stimulus" aria-live="polite"></div>
 
+      <!-- Feedback text (Positive / Negative) updated after each response -->
+      <div id="feedback" aria-live="polite"></div>
+
+      <!-- Two main choice buttons. IDs must match those referenced by game.js -->
       <div class="buttons">
         <button id="left-button">Left</button>
         <button id="right-button">Right</button>
       </div>
 
+      <!-- Score display - updated during gameplay -->
       <div id="score">Score: 0</div>
-      <div id="game-over"></div>
+
+      <!-- Game over message - starts hidden, shown at end -->
+      <div id="game-over" hidden></div>
+
+      <!-- Restart returns to the beginning; Skip instantly ends the game -->
       <button id="restart" hidden>Restart</button>
+      <button id="skip-to-end">Skip to End</button>
     </section>
 
-    <!-- Trophies Section -->
+    <!--
+      Recap panel: shows the attempts with thumbnails and labels.
+      Hidden at first; game.js unhides it at the end.
+    -->
+    <section id="attempts-panel" hidden>
+      <h2>Recap</h2>
+      <div id="attempts-list" aria-live="polite"></div>
+    </section>
+
+    <!--
+      Trophies: intentionally commented out for now so it doesn't appear in the UI.
+      You can remove the comment tags later to enable it, and then add JS to populate.
+    -->
+    <!--
     <section id="trophies-section" hidden>
-      <h2>Trophies Earned</h2>
+      <h2>Trophies</h2>
       <ul id="trophies-list"></ul>
     </section>
-
-    <!-- Attempts Section -->
-    <section id="attempts-panel" hidden>
-      <h2>Your Attempts</h2>
-      <div id="attempts-list"></div>
-    </section>
+    -->
   </main>
 
-  <!-- Sounds -->
-  <audio id="correct-sound" src="correct.wav" preload="auto"></audio>
-  <audio id="incorrect-sound" src="incorrect.wav" preload="auto"></audio>
+  <!--
+    Sounds for feedback. Paths match what the JS expects.
+    Preload so they play without extra delay.
+  -->
+  <audio id="correct-sound" src="/sounds/positive.wav" preload="auto"></audio>
+  <audio id="incorrect-sound" src="/sounds/negative.wav" preload="auto"></audio>
 
-  <!-- Scripts -->
+  <!-- Main game script -->
   <script src="game.js"></script>
 </body>
 </html>

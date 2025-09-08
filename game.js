@@ -1,390 +1,289 @@
 /*
-Busting Bias Game 
-Author: Ashton Curl
-Year: 2025
+  Busting Bias Game - JavaScript
+  Beginner-friendly inline comments added throughout.
+  Functionality:
+    - Shows a shuffled sequence of "alien" images
+    - Player categorizes each alien using Left/Right buttons or arrow keys
+    - Plays sounds on correct/incorrect
+    - Keeps score
+    - Logs each attempt into a Recap with thumbnail, choice, assigned category (Positive/Negative),
+      and a ✔ / ✘ mark. Rows alternate colors for readability.
+    - Skip to End button reveals the recap immediately
+    - Restart restarts the game
 */
 
-/* -----------------------------------------------------------
-   SERVICE WORKER SETUP (for offline support like a mobile app)
------------------------------------------------------------- */
-
-// First, check if the browser knows what a "serviceWorker" is.
-// A service worker is a special script that allows your site
-// to work offline or load faster by caching files.
+/* ----------------------------
+   Service Worker Registration
+   ----------------------------
+   This block registers a service worker if the browser supports it.
+   A service worker can help with offline support (optional).
+*/
 if ("serviceWorker" in navigator) {
-
-    // Tell the browser: "Wait until the whole page finishes loading."
     window.addEventListener("load", () => {
-
-        // Then register (connect) the service worker file you made
-        // called "service-worker.js".
-        navigator.serviceWorker
-            .register("/service-worker.js")
-
-            // If it works, print "SW registered" to the console log
-            // along with its scope (the part of the site it controls).
-            .then((reg) => console.log("SW registered", reg.scope))
-
-            // If something goes wrong, print an error to the console.
-            .catch((err) => console.error("SW registration failed", err));
+      navigator.serviceWorker
+        .register("/service-worker.js")
+        .then((reg) => console.log("SW registered", reg.scope))
+        .catch((err) => console.error("SW registration failed", err));
     });
-}
-
-
-/* -----------------------------------------------------------
-   MAIN GAME CODE STARTS HERE
-   We wait for the "DOMContentLoaded" event so the browser
-   has finished reading all HTML elements before we use them.
------------------------------------------------------------- */
-document.addEventListener('DOMContentLoaded', () => {
-
-  /* -------------------------------
-     1. CONNECT TO HTML ELEMENTS
-  --------------------------------*/
-
-  // These lines "grab" pieces of your HTML by their ID.
-  // After this, we can change them using JavaScript.
-  const stimulus = document.getElementById('stimulus');   // The main word the player sees
-  const feedback = document.getElementById('feedback');   // The ✔ or ✘ shown after answering
-  const leftButton = document.getElementById('left-button');   // The button for left choice
-  const rightButton = document.getElementById('right-button'); // The button for right choice
-  const scoreDisplay = document.getElementById('score');       // Where the score is shown
-  const restartButton = document.getElementById('restart');    // Restart game button
-  const gameOverMsg = document.getElementById('game-over');    // Message shown when game ends
-
-  // Sounds for correct/incorrect answers (from <audio> tags in HTML)
-  const correctSound = document.getElementById('correct-sound');
-  const incorrectSound = document.getElementById('incorrect-sound');
-
-  /* -------------------------------
-     2. GAME DATA
-  --------------------------------*/
-
-  // The "originalStimuli" is like a deck of cards. Each object
-  // has a "word" and the correct side (left/right).
-  const originalStimuli = [
-      { word: 'Apple', correct: 'left' },
-      { word: 'Banana', correct: 'right' },
-      { word: 'Dog', correct: 'right' },
-      { word: 'Car', correct: 'left' }
-  ];
-
-  // These variables keep track of the game as it runs:
-  let stimuli = [];        // Holds the shuffled version of the word list
-  let currentIndex = 0;    // Which word we are currently showing
-  let score = 0;           // The player’s score
-  let responses = [];      // Stores each answer the player makes
-
-  // Beginner-friendly comment: This variable stores the time when the current word appeared on screen
-  let startTime = 0; // Tracks when the current stimulus was shown
-
-  /* -------------------------------
-     3. HELPER FUNCTIONS
-  --------------------------------*/
-
-  // Randomly shuffle the array of words so the order changes every game.
-  function shuffleArray(array) {
-      return array.sort(() => Math.random() - 0.5);
   }
-
-  // Reset everything to start a new game.
-  function initGame() {
-      stimuli = shuffleArray([...originalStimuli]); // Make a shuffled copy of the list
-      currentIndex = 0;    // Start from first word
-      score = 0;           // Reset score
-      responses = [];      // Clear old answers
-
-      // Re-enable the buttons in case they were disabled after game over
+  
+  /* ----------------------------
+     Main DOMContentLoaded wrapper
+     ----------------------------
+     We wait for the DOM to finish loading so all elements are present.
+     Then we grab references to elements and wire up event listeners.
+  */
+  document.addEventListener("DOMContentLoaded", () => {
+    /* -------------------------
+       Element references (cached)
+       -------------------------
+       We store references to DOM elements we will update often.
+       Using const helps prevent accidental reassignment.
+    */
+    const stimulus = document.getElementById("stimulus");         // where alien image appears
+    const feedback = document.getElementById("feedback");         // text shown after a response
+    const leftButton = document.getElementById("left-button");    // negative choice
+    const rightButton = document.getElementById("right-button");  // positive choice
+    const restartButton = document.getElementById("restart");    // restart control
+    const skipButton = document.getElementById("skip-to-end");   // skip to end control
+    const gameOverMsg = document.getElementById("game-over");    // "Game Over" message
+    const scoreDisplay = document.getElementById("score");       // score text on page
+  
+    // Recap UI
+    const attemptsPanel = document.getElementById("attempts-panel"); // container for recap
+    const attemptsList  = document.getElementById("attempts-list");  // where rows are appended
+  
+    /* -------------------------
+       Sounds
+       -------------------------
+       Preload short sounds for immediate playback on responses.
+       Paths must match actual files on your server.
+    */
+    const positiveSound = new Audio("/sounds/positive.wav");
+    const negativeSound = new Audio("/sounds/negative.wav");
+  
+    /* -------------------------
+       Stimuli setup
+       -------------------------
+       We create a list of stimuli (image path + correct category).
+       - alienTypes and alienColors are small arrays so beginners can see how
+         stimuli are generated.
+       - The "correct" field is either "right" (Positive) or "left" (Negative).
+       - You can add more colors/types — just follow the file naming convention:
+         /images/<type>_<color>.png  e.g., /images/alien01_blue.png
+    */
+    const alienColors = ["blue", "brown", "green", "grey"];      // simple set of colors
+    const alienTypes  = ["alien01", "alien02"];                 // set of alien types
+  
+    // Build the original unshuffled stimuli list
+    const originalStimuli = [];
+    alienTypes.forEach((type, tIndex) => {
+      alienColors.forEach((color, cIndex) => {
+        // Construct the expected image path
+        const imagePath = `/images/${type}_${color}.png`;
+  
+        // Alternate categories so we have both Positive and Negative examples
+        // (simple parity trick: even => right, odd => left)
+        const category = (tIndex + cIndex) % 2 === 0 ? "right" : "left";
+  
+        // Each stimulus is an object with the image path and the correct category
+        originalStimuli.push({ image: imagePath, correct: category });
+      });
+    });
+  
+    /* -------------------------
+       Game state variables
+       -------------------------
+       These variables change during gameplay:
+       - stimuli: the shuffled stimuli array used for the current playthrough
+       - currentIndex: which trial we're on (0-based)
+       - score: number of correct responses so far
+    */
+    let stimuli = [];       // will be populated at game start
+    let currentIndex = 0;
+    let score = 0;
+  
+    /* -------------------------
+       Utility: shuffleArray
+       -------------------------
+       Randomize an array's order. This uses a simple sort-random trick
+       that's fine for small arrays and prototyping.
+       (There are more robust shuffles like Fisher-Yates for production.)
+    */
+    function shuffleArray(array) {
+      return array.sort(() => Math.random() - 0.5);
+    }
+  
+    /* -------------------------
+       initGame()
+       -------------------------
+       Reset everything and show the first stimulus.
+       This is also called when Restart is pressed.
+    */
+    function initGame() {
+      // copy & shuffle the original stimuli so we don't mutate it
+      stimuli = shuffleArray([...originalStimuli]);
+  
+      currentIndex = 0;            // start at the first item
+      score = 0;                   // reset score
+      scoreDisplay.textContent = "Score: 0"; // reset score in UI
+  
+      // re-enable controls and hide end-of-game UI
       leftButton.disabled = false;
       rightButton.disabled = false;
-
-      // Hide restart button and game over message until needed
-      restartButton.hidden = true;
-      gameOverMsg.hidden = true;
-
-      // Hide attempts panel and trophies section at start
-      const attemptsPanelAtStart = document.getElementById('attempts-panel');
-      const trophiesSectionAtStart = document.getElementById('trophies-section');
-
-      // Beginner-friendly: we use BOTH the HTML `hidden` attribute AND CSS `display:none`.
-      // Some CSS rules can override `hidden`, so `display:none` is a safe extra step.
-      attemptsPanelAtStart.hidden = true;
-      trophiesSectionAtStart.hidden = true;
-      attemptsPanelAtStart.style.display = 'none';
-      trophiesSectionAtStart.style.display = 'none';
-
-      // Update the score display (shows "Score: 0")
-      updateScoreDisplay();
-
-      // Show the very first word
+      restartButton.hidden = true;   // hide restart while playing
+      skipButton.hidden = false;     // allow skipping during play
+      gameOverMsg.hidden = true;     // hide game over text
+      attemptsPanel.hidden = true;   // hide recap until the end
+      attemptsList.innerHTML = "";   // clear old recap rows
+  
+      // show the first stimulus
       showNextStimulus();
-  }
-
-  // Show the next word on the screen with a fun animation.
-  function showNextStimulus() {
+    }
+  
+    /* -------------------------
+       showNextStimulus()
+       -------------------------
+       Render the current stimulus (image) into #stimulus.
+       If we run out of stimuli, call endGame().
+    */
+    function showNextStimulus() {
       if (currentIndex < stimuli.length) {
-
-          // Remove old animation classes in case they are still active
-          stimulus.classList.remove('slide-in-left', 'slide-in-right', 'shake');
-
-          // If the word belongs to "left", slide it in from the left.
-          // Otherwise, slide it in from the right.
-          const animClass = (stimuli[currentIndex].correct === 'left')
-              ? 'slide-in-left'
-              : 'slide-in-right';
-
-          // This line forces the browser to reset before adding new class.
-          void stimulus.offsetWidth;
-
-          // Add the animation class and show the word
-          stimulus.classList.add(animClass);
-          stimulus.textContent = stimuli[currentIndex].word;
-
-          // Beginner-friendly comment: Record the time when this word appeared, so we can measure response speed
-          startTime = Date.now();
+        const alien = stimuli[currentIndex];
+  
+        // Insert an <img> so the CSS can size it responsively.
+        // alt text helps screen readers.
+        stimulus.innerHTML = `<img src="${alien.image}" alt="Alien ${currentIndex + 1}" style="max-width:100%; height:auto;">`;
+  
+        // clear any prior feedback text
+        feedback.textContent = "";
       } else {
-          // If we’ve shown all words, end the game.
-          endGame();
+        // no more trials
+        endGame();
       }
-  }
-
-  // Show ✔ or ✘ after an answer
-  function showFeedback(isCorrect) {
-      // Change text based on correct or not
-      feedback.textContent = isCorrect ? '✔' : '✘';
-
-      // Add CSS class so it shows green/red styles
-      feedback.className = isCorrect ? 'correct' : 'incorrect';
-
-      // Make it visible
-      feedback.style.display = 'block';
-
-      // Play the correct or incorrect sound
-      isCorrect ? correctSound.play() : incorrectSound.play();
-
-      // If wrong, make the word "shake" for extra feedback
-      if (!isCorrect) {
-          stimulus.classList.add('shake');
-          setTimeout(() => stimulus.classList.remove('shake'), 400);
-      }
-
-      // After 0.6 seconds, hide feedback and move on
-      setTimeout(() => {
-          feedback.style.display = 'none';
-          currentIndex++;         // Go to the next word
-          showNextStimulus();     // Display it
-      }, 600);
-  }
-
-  // Handle when the player chooses left or right
-  function handleResponse(choice) {
-      // If no words left, do nothing
+    }
+  
+    /* -------------------------
+       logAttempt(alien, choice)
+       -------------------------
+       Append a row to the recap that includes:
+         - thumbnail image
+         - player's choice (LEFT or RIGHT)
+         - the category assigned to that alien (Positive or Negative)
+           -> Positive uses the "right" category (green)
+           -> Negative uses the "left" category (red)
+         - a ✔ or ✘ indicating whether the player's choice matched the correct category
+    */
+    function logAttempt(alien, choice) {
+      // Determine if the player's choice matched the correct category
+      const isCorrect = choice === alien.correct;
+  
+      // Create a container for the row
+      const item = document.createElement("div");
+      item.className = "attempt-item"; // CSS handles alternating background
+  
+      // We add four columns: thumbnail, choice, assigned category, correctness mark
+      // Use template string for readability. Note the class on the category span:
+      // if alien.correct === "right" we use .positive (green); otherwise .negative (red)
+      item.innerHTML = `
+        <img src="${alien.image}" alt="Thumbnail">
+        <span>${choice.toUpperCase()}</span>
+        <span class="${alien.correct === "right" ? "positive" : "negative"}">
+          ${alien.correct === "right" ? "Positive" : "Negative"}
+        </span>
+        <span>${isCorrect ? "✔" : "✘"}</span>
+      `;
+  
+      // Append the row to the recap list
+      attemptsList.appendChild(item);
+    }
+  
+    /* -------------------------
+       handleResponse(choice)
+       -------------------------
+       Called when the player makes a choice ("left" or "right").
+       - Plays sounds
+       - Updates score and feedback text
+       - Logs the attempt to the recap
+       - Moves to the next stimulus after a short delay so the player sees feedback
+    */
+    function handleResponse(choice) {
+      // Guard: don't accept responses if we are already past the last stimulus
       if (currentIndex >= stimuli.length) return;
-
-      // Grab the current word object
-      const wordObj = stimuli[currentIndex];
-
-      // Check if the player’s choice matches the correct answer
-      const isCorrect = (choice === wordObj.correct);
-
-      // Increase score if correct
-      if (isCorrect) score++;
-
-      // Update the score on screen
-      updateScoreDisplay();
-
-      // Beginner-friendly comment: Calculate how long it took the player to answer (in seconds)
-      const timeTaken = (Date.now() - startTime) / 1000;
-
-      // Beginner-friendly: also store the correct answer so we can show it later in the attempts panel
-      saveResponse({ word: wordObj.word, choice, isCorrect, timeTaken, correctAnswer: wordObj.correct });
-
-      // Show ✔ or ✘ feedback
-      showFeedback(isCorrect);
-  }
-
-  // Update the text that shows score.
-  function updateScoreDisplay(final = false) {
-      scoreDisplay.textContent = final
-          ? `Final Score: ${score} / ${stimuli.length}` // At game over
-          : `Score: ${score}`; // During the game
-  }
-
-  // Save player’s answers to localStorage so it remembers across page reloads
-  function saveResponse(response) {
-      responses.push(response);
-      localStorage.setItem('gameData', JSON.stringify(responses));
-  }
-
-  /* -------------------------------
-     4. TROPHIES AND GAME OVER
-  --------------------------------*/
-
-  // Check if the player earned any trophies
-  function checkTrophies(score, responses) {
-      const trophies = [];
-      const totalQuestions = responses.length;
-
-      // Trophy if player got everything right
-      if (score === totalQuestions) {
-          trophies.push('🏆 Perfect Score: You got everything right!');
+  
+      const alien = stimuli[currentIndex];      // the stimulus for this trial
+      const isCorrect = choice === alien.correct;
+  
+      // Show feedback text and play appropriate sound
+      if (isCorrect) {
+        feedback.textContent = "Positive";    // text shown in the feedback area
+        positiveSound.play();                 // play positive sound
+        score++;                              // increment score
+        scoreDisplay.textContent = `Score: ${score}`; // update UI
+      } else {
+        feedback.textContent = "Negative";
+        negativeSound.play();
       }
-
-      // Trophy for playing at least 10 rounds
-      if (responses.length >= 10) {
-          trophies.push('🏆 Persistence: You played 10 or more rounds!');
-      }
-
-      // Trophy for answering 5 questions in under 2 seconds
-      const fastResponses = responses.filter(response => response.timeTaken <= 2);
-      if (fastResponses.length >= 5) {
-          trophies.push('🏆 Fast Swiper: You responded quickly 5 or more times!');
-      }
-
-      return trophies;
-  }
-
-  // End the game and show the results
-  function endGame() {
-      // Beginner-friendly: This console message helps confirm we reached the end game logic
-      console.debug('[Busting Bias] endGame() reached');
-
-      // Replace the word with "Game Over!"
-      stimulus.textContent = '🎉 Game Over!';
-
-      // Show final score
-      updateScoreDisplay(true);
-
-      // Disable the buttons
+  
+      // Log this attempt into the recap panel (thumbnail + details)
+      logAttempt(alien, choice);
+  
+      // Move on to the next stimulus after a short pause (600ms)
+      // The pause gives time for feedback and sound to register.
+      setTimeout(() => {
+        currentIndex++;
+        showNextStimulus();
+      }, 600);
+    }
+  
+    /* -------------------------
+       endGame()
+       -------------------------
+       Called when the player finishes all stimuli or presses Skip to End.
+       - Shows "Game Over"
+       - Disables controls
+       - Shows the recap panel with the logged attempts
+    */
+    function endGame() {
+      // Clear the stimulus area (no image)
+      stimulus.innerHTML = "";
+  
+      // Show game over message
+      gameOverMsg.textContent = "Game Over!";
+      gameOverMsg.hidden = false;
+  
+      // Disable buttons so the player can't respond further
       leftButton.disabled = true;
       rightButton.disabled = true;
-
-      // Show game over message
-      gameOverMsg.textContent = `You scored ${score} out of ${stimuli.length}!`;
-      gameOverMsg.hidden = false;
-
-      // Show the restart button
+  
+      // Show restart button (allowing a new playthrough)
       restartButton.hidden = false;
-
-      // Show all attempts the player made
-      const attemptsPanel = document.getElementById('attempts-panel');
-      const attemptsList = document.getElementById('attempts-list');
-      attemptsList.innerHTML = ''; // Clear previous attempts
-
-      // Beginner-friendly: Build a detailed attempts list with index, your choice, the correct side, ✔/✘, and time.
-      responses.forEach((response) => {
-          const attemptItem = document.createElement('div');
-          attemptItem.classList.add('attempt-item', response.isCorrect ? 'correct' : 'incorrect');
-
-          // Friendly labels for left/right
-          const chosenLabel = response.choice === 'left' ? 'Left' : 'Right';
-          const correctLabel = response.correctAnswer
-              ? (response.correctAnswer === 'left' ? 'Left' : 'Right')
-              // Fallback if older saved data didn't include `correctAnswer`
-              : (response.isCorrect ? chosenLabel : (response.choice === 'left' ? 'Right' : 'Left'));
-
-          // Show time in seconds to one decimal place (or a dash if unavailable)
-          const seconds = (typeof response.timeTaken === 'number' && !Number.isNaN(response.timeTaken))
-              ? response.timeTaken.toFixed(1)
-              : '—';
-
-          // 1-based index (how many items are already in the list + 1)
-          const indexNum = attemptsList.childElementCount + 1;
-
-          attemptItem.innerHTML = `
-              <span class="attempt-index">${indexNum}.</span>
-              <span class="attempt-word">${response.word}</span>
-              <span class="attempt-choice">You: ${chosenLabel}</span>
-              <span class="attempt-correct">Correct: ${correctLabel}</span>
-              <span class="attempt-result">${response.isCorrect ? '✔' : '✘'}</span>
-              <span class="attempt-time">${seconds}s</span>
-          `;
-
-          attemptsList.appendChild(attemptItem);
-      });
-
-      // Make sure the attempts panel is visible (remove `hidden` and force display:block just in case CSS had display:none)
+  
+      // Hide skip (we're already at end)
+      skipButton.hidden = true;
+  
+      // Reveal the recap panel created during play
       attemptsPanel.hidden = false;
-      attemptsPanel.style.display = 'block';
-
-      // Beginner-friendly: Scroll the attempts panel into view so desktop users see it immediately.
-      attemptsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-      // Show trophies earned
-      const trophies = checkTrophies(score, responses);
-      const trophiesSection = document.getElementById('trophies-section');
-      const trophiesList = document.getElementById('trophies-list');
-      trophiesList.innerHTML = '';
-
-      trophies.forEach((trophy) => {
-          const trophyItem = document.createElement('li');
-          trophyItem.innerHTML = `<span>${trophy}</span>`;
-          trophiesList.appendChild(trophyItem);
-      });
-
-      // Beginner-friendly: Always show the trophies section and force it visible in case CSS had display:none
-      trophiesSection.hidden = false;
-      trophiesSection.style.display = 'block';
-
-      if (trophies.length === 0) {
-          // If no trophies earned, show a friendly message
-          const noTrophyItem = document.createElement('li');
-          noTrophyItem.textContent = "No trophies earned this time. Try again!";
-          trophiesList.appendChild(noTrophyItem);
-      }
-  }
-
-  /* -------------------------------
-     5. EVENT LISTENERS (PLAYER INPUT)
-  --------------------------------*/
-
-  // When restart button is clicked, restart the game
-  restartButton.addEventListener('click', initGame);
-
-  // When left or right button is clicked
-  leftButton.addEventListener('click', () => handleResponse('left'));
-  rightButton.addEventListener('click', () => handleResponse('right'));
-
-  // Support keyboard arrow keys
-  document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft') handleResponse('left');
-      if (e.key === 'ArrowRight') handleResponse('right');
+    }
+  
+    /* -------------------------
+       Event listeners (user interactions)
+       -------------------------
+       These wire up the UI controls to the functions above.
+    */
+    restartButton.addEventListener("click", initGame);  // restart the game
+    skipButton.addEventListener("click", endGame);      // skip straight to results
+  
+    // Left / Right button handlers
+    leftButton.addEventListener("click", () => handleResponse("left"));
+    rightButton.addEventListener("click", () => handleResponse("right"));
+  
+    // Keyboard support: ArrowLeft and ArrowRight behave like the buttons
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft")  handleResponse("left");
+      if (e.key === "ArrowRight") handleResponse("right");
+    });
+  
+    // Start the first game automatically when page loads
+    initGame();
   });
-
-  // Support swiping on touch screens (like phones)
-  let touchStartX = 0, currentX = 0, isDragging = false;
-
-  stimulus.addEventListener('touchstart', (e) => {
-      touchStartX = e.changedTouches[0].screenX;
-      isDragging = true;
-      stimulus.style.transition = 'none'; // Stop smooth animation while dragging
-  });
-
-  stimulus.addEventListener('touchmove', (e) => {
-      if (!isDragging) return;
-      currentX = e.changedTouches[0].screenX;
-      const offset = currentX - touchStartX;
-      stimulus.style.transform = `translateX(${offset}px)`; // Word follows your finger
-  });
-
-  stimulus.addEventListener('touchend', (e) => {
-      if (!isDragging) return;
-      isDragging = false;
-      const swipeDistance = currentX - touchStartX;
-
-      // If swipe is far enough, count as left or right choice
-      if (Math.abs(swipeDistance) > 100) {
-          const choice = swipeDistance > 0 ? 'right' : 'left';
-          handleResponse(choice);
-      } else {
-          // Otherwise, snap word back to center
-          stimulus.style.transition = 'transform 0.3s ease';
-          stimulus.style.transform = 'translateX(0)';
-      }
-  });
-
-  /* -------------------------------
-     6. START THE GAME AUTOMATICALLY
-  --------------------------------*/
-  initGame(); // Begin when page loads
-});

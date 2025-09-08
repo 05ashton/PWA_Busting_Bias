@@ -1,18 +1,20 @@
 // service-worker.js
-const CACHE_NAME = "busting-bias-v2";
+// This file enables offline support by caching assets for the game.
 
-// List all assets you want to pre-cache
+const CACHE_NAME = "busting-bias-v2"; // Name of the cache for this version
+
+// List of assets to pre-cache for offline use
 const PRECACHE_ASSETS = [
-  "/",
-  "/index.html",
-  "/style.css",
-  "/game.js",
-  "/manifest.json",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/correct.wav",
-  "/incorrect.wav"
-  // "/offline.html" // add later if you create it
+  "/", // Root page
+  "/index.html", // Main HTML file
+  "/style.css", // Stylesheet
+  "/game.js", // Game logic
+  "/manifest.json", // PWA manifest
+  "/icons/icon-192.png", // App icon (small)
+  "/icons/icon-512.png", // App icon (large)
+  "/correct.wav", // Sound for correct answers
+  "/incorrect.wav", // Sound for incorrect answers
+  "/offline.html" // Offline fallback page
 ];
 
 // Install: pre-cache core assets safely
